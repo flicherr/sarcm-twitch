@@ -1,5 +1,5 @@
-## twitch-sarc
-A console application for saving, analyzing, and replaying chat Twitch stream.
+# twitch-sarcm
+A console application for saving, analyzing and replaying chat messages Twitch stream.
 
 ### Features
 - Saving the actions of chatters in Twitch live stream in a local SQLite database:
@@ -18,13 +18,12 @@ A console application for saving, analyzing, and replaying chat Twitch stream.
 ### Installation
 Building for your current system architecture:
 ```bash
-git clone https://github.com/flicherr/chat_analyzer_and_replay.git
-cmake -B --build -S .
+git clone https://github.com/flicherr/twitch-sarcm.git
+cmake -S . -B --build -G Ninja
 cmake --build build
 ```
 
 ### Use examples
 ```bash
-./chaar <flags> <parametrs>
+./sarcm
 ```
-

@@ -1,5 +1,1 @@
-
-
-int main() {
-
-}
+#include <iostream>import auth;import connection;int main() {	AuthManager &auth = AuthManager::instance({		"xy75wpl6n3erfhkkde0wkcmoz3ykdi",		"http://localhost:8080/callback"	});	auth.authorize();	std::cout << "IRC PASS: " << auth.get_oauth_irc_token() << "\n";	Connection conn;	if (conn.connect("irc.chat.twitch.tv", "6667", "flicherr", "akaxekc")) {		std::cout << "connected!\n";	} else {		std::cout << "connection error.\n";	}	return 0;}
