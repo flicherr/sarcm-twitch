@@ -12,12 +12,12 @@ module;
 export module parser;
 
 struct ChatMessage {
-	std::string raw;                   // оригинальное сообщение
-	std::map<std::string, std::string> tags; // все теги Twitch IRC
-	std::string prefix;                // часть вида user!user@user.tmi.twitch.tv
-	std::string command;               // PRIVMSG, JOIN, PART, PING и т.д.
-	std::string channel;               // #channel
-	std::string text;                  // текст сообщения
+	std::string raw;                   			// оригинальное сообщение
+	std::map<std::string, std::string> tags;	// все теги Twitch IRC
+	std::string prefix;                			// часть вида user!user@user.tmi.twitch.tv
+	std::string command;               			// PRIVMSG, JOIN, PART, PING и т.д.
+	std::string channel;               			// #channel
+	std::string text;                  			// текст сообщения
 };
 
 export ChatMessage parse_irc_message(const std::string &raw) {
@@ -68,11 +68,25 @@ export ChatMessage parse_irc_message(const std::string &raw) {
 	return msg;
 }
 
-std::string apply_ansi_color(const std::string& hex_color, const std::string& text) {
+std::string apply_ansi_color(const std::string &hex_color,
+							 const std::string &text) {
 	if (hex_color.empty() || hex_color[0] != '#') return text;
 
-	int r, g, b;
-	if (sscanf(hex_color.c_str()+1, "%02x%02x%02x", &r, &g, &b) != 3) return text;
+	int r = 255, g = 255, b = 255; // fallback белый
+
+	if (hex_color.size() == 7) {
+		// #RRGGBB
+		unsigned int rv, gv, bv;
+		if (sscanf(hex_color.c_str() + 1, "%02x%02x%02x", &rv, &gv, &bv) == 3) {
+			r = rv; g = gv; b = bv;
+		}
+	} else if (hex_color.size() == 4) {
+		// #RGB → #RRGGBB
+		unsigned int rv, gv, bv;
+		if (sscanf(hex_color.c_str() + 1, "%1x%1x%1x", &rv, &gv, &bv) == 3) {
+			r = rv * 17; g = gv * 17; b = bv * 17;
+		}
+	}
 
 	std::ostringstream out;
 	out << "\033[38;2;" << r << ";" << g << ";" << b << "m" << text << "\033[0m";
@@ -84,6 +98,10 @@ inline const std::unordered_map<std::string, std::string> BADGE_MAP = {
 	{"moderator",   "🛡"},
 	{"vip",         "💎"},
 	{"subscriber",  "⭐"},
+	{"founder",     "🚀"},
+	{"turbo",       "⚡"},
+	{"premium",     "👑"},
+	{"artist-badge","🎨"},
 };
 
 export std::string format_chat_message(const ChatMessage &msg) {

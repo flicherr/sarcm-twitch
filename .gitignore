@@ -1,0 +1,5 @@
+.idea
+build
+token.txt
+/.clang-format
+/.gitignore

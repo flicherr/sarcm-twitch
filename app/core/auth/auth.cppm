@@ -109,7 +109,7 @@ private:
 					std::string page =
 						"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
 						"<!DOCTYPE html><body>"
-						"<p>Twitch account authorisation is being performed..</p>"
+						"<p>Twitch account authorisation is being performed.</p>"
 						"<script>"
 						"const hash = window.location.hash.substring(1);"
 						"const params = new URLSearchParams(hash);"
@@ -127,20 +127,22 @@ private:
 					{
 						std::lock_guard<std::mutex> lock(_mutex);
 						_token.access_token = token_str;
-						_token.expires_at = std::chrono::system_clock::now() + std::chrono::hours(4);
+						_token.expires_at = std::chrono::system_clock::now() +
+											std::chrono::hours(4);
 					}
 
 					_token_received = true;
 					_token_cv.notify_one();
 
 					/* simple response */
-					std::string response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
-										   "<html><body>Token received!</body></html>";
+					std::string response =
+						"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
+						"<html><body>token received!</body></html>";
 					asio::write(socket, asio::buffer(response));
 				}
 			}
 		} catch (std::exception& e) {
-			std::cerr << "[AuthManager] Server error: " << e.what() << "\n";
+			std::cerr << "[AuthManager] server error: " << e.what() << "\n";
 		}
 	}
 

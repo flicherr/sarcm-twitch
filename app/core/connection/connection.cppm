@@ -13,9 +13,6 @@ import parser;
 
 using asio::ip::tcp;
 
-using MsgHandler = std::function<void(const std::string_view&)>;
-using ErrHandler = std::function<void(const std::string_view&)>;
-
 export class Connection {
 public:
 	explicit Connection() : _socket(_io_context) {}
@@ -34,7 +31,7 @@ public:
 			asio::connect(_socket, endpoints);
 
 			/* authorize IRC */
-			auto& auth = AuthManager::instance({
+			auto &auth = AuthManager::instance({
 				"xy75wpl6n3erfhkkde0wkcmoz3ykdi",
 				"http://localhost:8080/callback"
 			});
@@ -52,13 +49,9 @@ public:
 			return true;
 
 		} catch (std::exception &e) {
-			if (_on_error) _on_error(e.what());
+			std::cerr << e.what() << '\n';
 			return false;
 		}
-	}
-
-	void start_read() {
-		do_read();
 	}
 
 	void close() {
@@ -66,13 +59,6 @@ public:
 		if (_socket.is_open()) {
 			_socket.close();
 		}
-	}
-
-	void set_msg_handler(const MsgHandler &handler) {
-		_on_message = std::move(handler);
-	}
-	void set_err_handler(const ErrHandler &handler) {
-		_on_error = std::move(handler);
 	}
 
 private:
@@ -83,9 +69,6 @@ private:
 	std::string _nick;
 	std::string _channel;
 	std::string _oauth_token;
-
-	MsgHandler _on_message;
-	ErrHandler _on_error;
 
 	void send_line(const std::string &line) {
 		std::string msg = line + "\r\n";
@@ -106,18 +89,11 @@ private:
 					if (msg.find("PRIVMSG") != std::string::npos) {
 						auto chat = parse_irc_message(msg);
 						std::cout << format_chat_message(chat) << "\n";
-//						std::cout << "[" << chat.display_name << "] " << chat.text << "\n";
-					}
-
-					if (_on_message) {
-						_on_message(msg);
 					}
 
 					do_read();
 				} else {
-					if (_on_error) {
-						_on_error(ec.message());
-					}
+					std::cerr << ec.message() << '\n';
 				}
 			});
 		_io_context.run();
