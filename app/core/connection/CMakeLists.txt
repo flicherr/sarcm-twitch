@@ -6,4 +6,4 @@ target_sources(connection
 		FILES
 			connection.cppm
 )
-target_link_libraries(connection PRIVATE auth parser)
+target_link_libraries(connection PRIVATE auth parser entities storage)

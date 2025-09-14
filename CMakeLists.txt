@@ -15,11 +15,13 @@ set(COMMON_FLAGS
 
 add_subdirectory(app/core/auth)
 add_subdirectory(app/core/parser)
+add_subdirectory(app/core/storage/entities)
+add_subdirectory(app/core/storage)
 add_subdirectory(app/core/connection)
 add_executable(${PROJECT_NAME} app/main.cpp)
 target_link_libraries(${PROJECT_NAME} PRIVATE
 	auth
-	parser
+	storage
 	connection
 )
 

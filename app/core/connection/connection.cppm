@@ -10,6 +10,7 @@ export module connection;
 
 import auth;
 import parser;
+import storage;
 
 using asio::ip::tcp;
 
@@ -87,8 +88,14 @@ private:
 					send_line("PONG :tmi.twitch.tv");
 				}
 					if (msg.find("PRIVMSG") != std::string::npos) {
-						auto chat = parse_irc_message(msg);
-						std::cout << format_chat_message(chat) << "\n";
+						auto parsed = parse_irc_message(msg);
+
+						auto &storage = StorageManager::instance();
+						storage.upsert_user({parsed.user_id, parsed.username, parsed.display_name});
+						storage.upsert_user_tags({parsed.user_id, parsed.channel, parsed.badges, parsed.color});
+						storage.save_message({parsed.channel, parsed.user_id, parsed.text, parsed.timestamp});
+
+						std::cout << format_chat_message(parsed) << "\n";
 					}
 
 					do_read();

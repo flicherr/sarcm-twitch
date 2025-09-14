@@ -3,6 +3,7 @@ module;
 #include <iostream>
 #include <sstream>
 #include <iomanip>
+#include <chrono>
 #include <string>
 #include <vector>
 #include <regex>
@@ -11,27 +12,38 @@ module;
 
 export module parser;
 
-struct ChatMessage {
-	std::string raw;                   			// оригинальное сообщение
+struct ParsedMessage {
 	std::map<std::string, std::string> tags;	// все теги Twitch IRC
 	std::string prefix;                			// часть вида user!user@user.tmi.twitch.tv
 	std::string command;               			// PRIVMSG, JOIN, PART, PING и т.д.
-	std::string channel;               			// #channel
-	std::string text;                  			// текст сообщения
+
+	std::string user_id;
+	std::string display_name;
+	std::string username;
+	std::string timestamp;
+	std::string channel;
+	std::string badges;
+	std::string color;
+	std::string text;
 };
 
-export ChatMessage parse_irc_message(const std::string &raw) {
-	ChatMessage msg;
-	msg.raw = raw;
+inline const std::unordered_map<std::string, std::string> BADGE_MAP = {
+	{"moderator",   "⚔️"},
+	{"vip",         "🩷"},
+	{"subscriber",  "✨"},
+};
+
+export ParsedMessage parse_irc_message(const std::string &raw) {
+	ParsedMessage msg;
 
 	std::istringstream iss(raw);
 	std::string token;
 
-	// 1. Теги (начинаются с @)
+	/* tags (begin with @) */
 	if (!raw.empty() && raw[0] == '@') {
 		std::getline(iss, token, ' ');
-		// token = "@badge-info=;badges=...;display-name=User"
-		token.erase(0, 1); // убрать '@'
+		/* token = "@badge-info=;badges=...;display-name=User" */
+		token.erase(0, 1); /* rm '@' */
 		std::istringstream tags_stream(token);
 		std::string kv;
 		while (std::getline(tags_stream, kv, ';')) {
@@ -46,19 +58,63 @@ export ChatMessage parse_irc_message(const std::string &raw) {
 		}
 	}
 
-	// 2. Префикс (начинается с :)
+	/* prefix (begin with :) */
 	if (iss.peek() == ':') {
 		iss.get();
 		std::getline(iss, msg.prefix, ' ');
 	}
 
-	// 3. Команда (PRIVMSG, PING, NOTICE…)
+	/* command (PRIVMSG, PING, NOTICE…) */
 	iss >> msg.command;
 
-	// 4. Канал (например, #mychannel)
+	/* channel (e.g. #mychannel) */
 	iss >> msg.channel;
 
-	// 5. Текст (начинается с :)
+	/* user_id */
+	msg.user_id = msg.tags.contains("user-id") ? msg.tags.at("user-id") : "";
+
+	/* display name */
+	msg.display_name = msg.tags.contains("display-name")
+						? msg.tags.at("display-name") : msg.prefix;
+
+	/* username */
+	auto exclam = msg.prefix.find('!');
+	msg.username = (exclam != std::string::npos) ? msg.prefix.substr(0, exclam) : msg.prefix;
+
+	/* timestamp (tmi-sent-ts) SO 8601 */
+	if (msg.tags.contains("tmi-sent-ts")) {
+		try {
+			std::chrono::milliseconds ms(std::stoll(msg.tags.at("tmi-sent-ts")));
+			std::chrono::system_clock::time_point tp(ms);
+			std::time_t t = std::chrono::system_clock::to_time_t(tp) + 3 * 3600;
+			std::tm tm{};
+			gmtime_r(&t, &tm);
+			char buf[32];
+			strftime(buf, sizeof(buf), "%Y-%m-%d\n%H:%M:%S", &tm);
+			msg.timestamp = buf;
+		} catch(...) {
+			msg.timestamp = "";
+		}
+	}
+
+	/* bages */
+	if (msg.tags.contains("badges")) {
+		std::istringstream iss(msg.tags.at("badges"));
+		std::string badge;
+		while (std::getline(iss, badge, ',')) {
+			auto pos = badge.find('/');
+			std::string key = (pos != std::string::npos)
+								? badge.substr(0,pos) : badge;
+			if (BADGE_MAP.contains(key)) {
+				msg.badges += key + " ";
+			}
+		}
+	}
+
+	/* color */
+	msg.color = msg.tags.contains("color") ? msg.tags.at("color") : "";
+
+	/* text msg (begin with :) */
 	std::getline(iss, msg.text);
 	if (!msg.text.empty() && msg.text[0] == ' ')
 		msg.text.erase(0, 1);
@@ -68,8 +124,7 @@ export ChatMessage parse_irc_message(const std::string &raw) {
 	return msg;
 }
 
-std::string apply_ansi_color(const std::string &hex_color,
-							 const std::string &text) {
+std::string apply_ansi_color(const std::string &hex_color, const std::string &text) {
 	if (hex_color.empty() || hex_color[0] != '#') return text;
 
 	int r = 255, g = 255, b = 255; // fallback белый
@@ -93,66 +148,23 @@ std::string apply_ansi_color(const std::string &hex_color,
 	return out.str();
 }
 
-inline const std::unordered_map<std::string, std::string> BADGE_MAP = {
-	{"broadcaster", "🎥"},
-	{"moderator",   "🛡"},
-	{"vip",         "💎"},
-	{"subscriber",  "⭐"},
-	{"founder",     "🚀"},
-	{"turbo",       "⚡"},
-	{"premium",     "👑"},
-	{"artist-badge","🎨"},
-};
-
-export std::string format_chat_message(const ChatMessage &msg) {
+export std::string format_chat_message(const ParsedMessage &msg) {
 	std::ostringstream out;
 
-	// Ник
-	std::string user = msg.tags.contains("display-name") ? msg.tags.at("display-name") : msg.prefix;
-	std::string color = msg.tags.contains("color") ? msg.tags.at("color") : "";
-
-	// Бейджи
+	/* bages */
 	std::string badges_str;
-	if (msg.tags.contains("badges")) {
-		std::istringstream iss(msg.tags.at("badges"));
-		std::string badge;
-		while (std::getline(iss, badge, ',')) {
-			auto pos = badge.find('/');
-			std::string key = (pos != std::string::npos) ? badge.substr(0,pos) : badge;
-			if (BADGE_MAP.contains(key)) {
-				badges_str += BADGE_MAP.at(key) + " ";
-			}
+	std::istringstream iss(msg.badges);
+	std::string badge;
+	while (iss >> badge) {
+		if (BADGE_MAP.contains(badge)) {
+			badges_str += BADGE_MAP.at(badge) + " ";
 		}
 	}
 
-	// Форматируем строку
-	out << "[" << badges_str << apply_ansi_color(color, user) << "] ";
-	out << msg.text;
+	/* format str */
+	size_t start = msg.timestamp.find('\n') + 1;
+	out << msg.timestamp.substr(start, 5) << " [" << badges_str
+		<< apply_ansi_color(msg.color, msg.username) << "] " << msg.text;
 
 	return out.str();
 }
-
-//export ChatMessage parse_message(const std::string &raw) {
-//	ChatMessage msg;
-//
-//	// display-name=имя
-//	std::regex display_name_re(R"(display-name=([^;]*))");
-//	std::smatch m;
-//	if (std::regex_search(raw, m, display_name_re)) {
-//		msg.display_name = m[1].str();
-//	}
-//
-//	// ник из :username!
-//	std::regex user_re(R"(:([a-zA-Z0-9_]+)!.* PRIVMSG)");
-//	if (std::regex_search(raw, m, user_re)) {
-//		msg.user = m[1].str();
-//	}
-//
-//	// само сообщение (после PRIVMSG #channel :)
-//	std::regex text_re(R"(PRIVMSG\s+#[^\s]+\s+:(.*))");
-//	if (std::regex_search(raw, m, text_re)) {
-//		msg.text = m[1].str();
-//	}
-//
-//	return msg;
-//}
