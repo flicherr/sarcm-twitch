@@ -23,7 +23,8 @@ public:
 			std::cerr << "DB open error: " << sqlite3_errmsg(_db) << "\n";
 			return false;
 		}
-		sqlite3_exec(_db, "PRAGMA journal_mode = WAL;", nullptr, nullptr, nullptr);
+		exec("PRAGMA journal_mode=WAL;");
+		exec("PRAGMA synchronous=NORMAL;");
 
 		exec(R"SQL(
 	        CREATE TABLE IF NOT EXISTS users (
@@ -86,9 +87,9 @@ public:
 	void upsert_user_tags(const UserChannelTags &tags) {
 		sqlite3_stmt *stmt;
 		const char *sql = R"SQL(
-	        INSERT INTO user_channel_tags (user_id, channel_id, badges, color)
+		    INSERT INTO user_channel_tags (user_id, channel_id, badges, color)
 	        VALUES (?, ?, ?, ?)
-	        ON CONFLICT(user_id, channel_id) DO UPDATE SET
+	      	ON CONFLICT(user_id, channel_id) DO UPDATE SET
 	            badges = excluded.badges,
 	            color = excluded.color;
 	    )SQL";
@@ -111,7 +112,7 @@ public:
 	void save_message(const ChatMessage &msg) {
 		sqlite3_stmt *stmt;
 			const char *sql = R"SQL(
-	        INSERT INTO messages (channel_id, user_id, text, timestamp)
+		    INSERT INTO messages (channel_id, user_id, text, timestamp)
 	        VALUES (?, ?, ?, ?);
 	    )SQL";
 
@@ -141,9 +142,8 @@ private:
 	void exec(const std::string &sql) {
 		char* errMsg = nullptr;
 		if (sqlite3_exec(_db, sql.c_str(), nullptr, nullptr, &errMsg) != SQLITE_OK) {
-			std::string err = errMsg ? errMsg : "unknown error";
+			std::cerr << "SQLite error: " << errMsg << "\n";
 			sqlite3_free(errMsg);
-			throw std::runtime_error("SQLite error: " + err);
 		}
 	}
 
