@@ -1,4 +1,4 @@
-# twitch-sarcm
+# sarcm-Twitch
 A console application for saving, analyzing and replaying chat messages Twitch stream.
 
 ### Features
@@ -25,5 +25,5 @@ cmake --build build
 
 ### Use examples
 ```bash
-./sarcm
+./build/sarcm <your twitch-nikname> <channel>
 ```

@@ -46,7 +46,7 @@ public:
 
 			send_line("CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership");
 
-			do_read();
+			start_reading();
 			return true;
 
 		} catch (std::exception &e) {
@@ -76,7 +76,12 @@ private:
 		asio::write(_socket, asio::buffer(msg));
 	}
 
-	void do_read() {
+	void start_reading() {
+		do_read_once();
+		_io_context.run();
+	}
+
+	void do_read_once() {
 		asio::async_read_until(_socket, _buffer, "\r\n",
 			[this](std::error_code ec, std::size_t bytes_transferred) {
 				if (!ec) {
@@ -97,12 +102,10 @@ private:
 
 						std::cout << format_chat_message(parsed) << "\n";
 					}
-
-					do_read();
+					asio::post(_io_context, [this]() { do_read_once(); });
 				} else {
 					std::cerr << ec.message() << '\n';
 				}
 			});
-		_io_context.run();
 	}
 };
