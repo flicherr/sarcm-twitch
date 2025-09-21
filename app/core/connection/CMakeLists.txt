@@ -1,7 +1,7 @@
 add_library(connection)
 target_sources(connection
 	PUBLIC
-		FILE_SET modules_public
+		FILE_SET cxx_modules
 		TYPE CXX_MODULES
 		FILES
 			connection.cppm

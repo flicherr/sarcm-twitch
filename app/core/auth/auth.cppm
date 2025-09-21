@@ -91,6 +91,10 @@ private:
 					 token.expires_at.time_since_epoch()).count() << "\n";
 	}
 
+	std::string load_token() {
+		return "token:";
+	}
+
 	void run_local_server() {
 		try {
 			asio::io_context io_context;
@@ -128,7 +132,7 @@ private:
 						std::lock_guard<std::mutex> lock(_mutex);
 						_token.access_token = token_str;
 						_token.expires_at = std::chrono::system_clock::now() +
-											std::chrono::hours(4);
+											std::chrono::hours(24);
 					}
 
 					_token_received = true;

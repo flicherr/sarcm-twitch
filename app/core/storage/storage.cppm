@@ -9,7 +9,13 @@ module;
 
 export module storage;
 
-import storage.entities;
+import :entities;
+
+export struct UserMessageCount {
+	std::string display_name;
+	std::string color;
+	int message_count;
+};
 
 export class StorageManager {
 public:
@@ -130,6 +136,42 @@ public:
 		sqlite3_finalize(stmt);
 	}
 
+	std::vector<UserMessageCount> get_users(std::string channel, int limit = 10) {
+		std::vector<UserMessageCount> top_users;
+		top_users.reserve(limit);
+
+		std::string query = R"SQL(
+	        SELECT u.display_name, COALESCE(t.color, '') as color, COUNT(m.id) as cnt
+	        FROM users u
+	        JOIN messages m ON m.user_id = u.id
+			LEFT JOIN user_channel_tags t
+				ON t.user_id = u.id AND t.channel_id = m.channel_id
+	        WHERE m.channel_id = ?
+	        GROUP BY u.display_name, t.color
+	        ORDER BY cnt DESC
+	        LIMIT ?
+	    )SQL";
+
+		sqlite3_stmt *stmt;
+		if (sqlite3_prepare_v2(_db, query.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+			std::cerr << "SQLite error: " << "Failed to prepare statement" << "\n";
+			return {};
+		}
+		sqlite3_bind_text(stmt, 1, std::string("#" + channel).c_str(), -1, SQLITE_STATIC);
+		sqlite3_bind_int(stmt, 2, limit);
+
+		while (sqlite3_step(stmt) == SQLITE_ROW) {
+			UserMessageCount u;
+			u.display_name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+			u.color = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+			u.message_count = sqlite3_column_int(stmt, 2);
+			top_users.emplace_back(u);
+		}
+
+		sqlite3_finalize(stmt);
+		return top_users;
+	}
+
 private:
 	StorageManager() = default;
 	~StorageManager() {
@@ -140,7 +182,7 @@ private:
 	StorageManager& operator=(const StorageManager&) = delete;
 
 	void exec(const std::string &sql) {
-		char* errMsg = nullptr;
+		char *errMsg = nullptr;
 		if (sqlite3_exec(_db, sql.c_str(), nullptr, nullptr, &errMsg) != SQLITE_OK) {
 			std::cerr << "SQLite error: " << errMsg << "\n";
 			sqlite3_free(errMsg);

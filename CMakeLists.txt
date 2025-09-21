@@ -10,7 +10,11 @@ set(COMMON_FLAGS
 	-Wextra
 	-Werror
 	-pedantic
+	-stdlib=libc++
 	-fmodules
+	-fcxx-modules
+	-march=native
+	-O0
 )
 
 add_subdirectory(app/core/auth)
@@ -18,11 +22,14 @@ add_subdirectory(app/core/parser)
 add_subdirectory(app/core/storage/entities)
 add_subdirectory(app/core/storage)
 add_subdirectory(app/core/connection)
+add_subdirectory(app/core/analysis)
+
 add_executable(${PROJECT_NAME} app/main.cpp)
 target_link_libraries(${PROJECT_NAME} PRIVATE
 	auth
 	storage
 	connection
+	analysis
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${COMMON_FLAGS})

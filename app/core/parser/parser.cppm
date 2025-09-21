@@ -90,7 +90,7 @@ export ParsedMessage parse_irc_message(const std::string &raw) {
 			std::tm tm{};
 			gmtime_r(&t, &tm);
 			char buf[32];
-			strftime(buf, sizeof(buf), "%Y-%m-%d\n%H:%M:%S", &tm);
+			strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm);
 			msg.timestamp = buf;
 		} catch(...) {
 			msg.timestamp = "";
@@ -124,7 +124,7 @@ export ParsedMessage parse_irc_message(const std::string &raw) {
 	return msg;
 }
 
-std::string apply_ansi_color(const std::string &hex_color, const std::string &text) {
+export std::string apply_ansi_color(const std::string &hex_color, const std::string &text) {
 	if (hex_color.empty() || hex_color[0] != '#') return text;
 
 	int r = 255, g = 255, b = 255; // fallback белый
@@ -162,9 +162,9 @@ export std::string format_chat_message(const ParsedMessage &msg) {
 	}
 
 	/* format str */
-	size_t start = msg.timestamp.find('\n') + 1;
+	size_t start = msg.timestamp.find('T') + 1;
 	out << msg.timestamp.substr(start, 5) << " [" << badges_str
-		<< apply_ansi_color(msg.color, msg.username) << "] " << msg.text;
+		<< apply_ansi_color(msg.color, msg.display_name) << "] " << msg.text;
 
 	return out.str();
 }
