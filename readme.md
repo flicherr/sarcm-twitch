@@ -18,12 +18,33 @@ A console application for saving, analyzing and replaying chat messages Twitch s
 ### Installation
 Building for your current system architecture:
 ```bash
-git clone https://github.com/flicherr/twitch-sarcm.git
+git clone https://github.com/flicherr/sarcm-twitch.git
 cmake -S . -B --build -G Ninja
 cmake --build build
 ```
 
 ### Use examples
+Startup:
 ```bash
-./build/sarcm <your twitch-nikname> <channel>
+./build/sarcm
+```
+Start capturing the channel chat:
+```bash
+> start <your_nickname> <channel>
+```
+Stop capturing the channel chat:
+```bash
+> stop <channel>
+```
+Stop capturing the chats of all channels:
+```bash
+> stop-all
+```
+Display information about the channel's top users:
+```bash
+> top-us <channel> <quantity>
+```
+Execute command terminal:
+```bash
+> !clear
 ```
