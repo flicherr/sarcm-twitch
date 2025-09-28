@@ -44,6 +44,10 @@ Display information about the channel's top users:
 ```bash
 > top-us <channel> <quantity>
 ```
+Display list active channels:
+```bash
+> status // OR stat
+```
 Execute command terminal:
 ```bash
 > !clear
