@@ -1,23 +1,24 @@
 module;
 
 #include <asio.hpp>
-#include <iostream>
+#include <chrono>
 #include <fstream>
+#include <iostream>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <chrono>
-#include <optional>
-#include <mutex>
 #include <thread>
 
 export module auth;
 
 using asio::ip::tcp;
 
+static const auto path_token = "token.txt";
+
 struct Config {
-	std::string client_id;
-	std::string redirect_uri;
+	const std::string client_id {"xy75wpl6n3erfhkkde0wkcmoz3ykdi"};
+	const std::string redirect_uri {"http://localhost:8080/callback"};
 };
 
 struct Token {
@@ -31,8 +32,8 @@ struct Token {
 
 export class AuthManager {
 public:
-	static AuthManager &instance(const Config &config) {
-		static AuthManager inst(config);
+	static AuthManager &instance() {
+		static AuthManager inst;
 		return inst;
 	}
 
@@ -42,9 +43,9 @@ public:
 	Token get_token() const {
 		std::lock_guard<std::mutex> lock(_mutex);
 		if (_token.access_token.empty())
-			throw std::runtime_error("No token set");
+			throw std::runtime_error("[AuthManager] No token set");
 		if (_token.is_expired())
-			throw std::runtime_error("Token expired");
+			throw std::runtime_error("[AuthManager] Token expired");
 		return _token;
 	}
 
@@ -65,7 +66,7 @@ public:
 		}
 
 		server_thread.join();
-		save_token(_token, "token.txt");
+		save_token();
 	}
 
 private:
@@ -79,20 +80,36 @@ private:
 		return oss.str();
 	}
 
-	void save_token(const Token &token, const std::string &path) {
-		std::lock_guard<std::mutex> lock(_mutex);
-		std::ofstream file(path, std::ios::trunc);
+	void save_token() const {
+		std::lock_guard lock(_mutex);
+		std::ofstream file(path_token, std::ios::trunc);
 		if (!file.is_open()) {
-			throw std::runtime_error("Cannot open file: " + path);
+			std::cerr << "[AuthManager] Cannot open file: " << path_token;
+			return;
 		}
 
-		file << token.access_token << "\n"
-			 << std::chrono::duration_cast<std::chrono::seconds>(
-					 token.expires_at.time_since_epoch()).count() << "\n";
+		file << _token.access_token << "\n"
+			 << _token.expires_at.time_since_epoch().count();
+		file.close();
 	}
 
-	std::string load_token() {
-		return "token:";
+	void load_token() {
+		std::lock_guard lock(_mutex);
+		std::ifstream file(path_token, std::ios::binary);
+		if (!file.is_open()) {
+			authorize();
+			return;
+		}
+
+		long long expires_at;
+		file >> _token.access_token >> expires_at;
+		_token.expires_at = std::chrono::system_clock::time_point(
+			std::chrono::system_clock::duration(expires_at));
+
+		if (_token.is_expired() || _token.access_token.empty()) {
+			authorize();
+		}
+		file.close();
 	}
 
 	void run_local_server() {
@@ -132,7 +149,7 @@ private:
 						std::lock_guard<std::mutex> lock(_mutex);
 						_token.access_token = token_str;
 						_token.expires_at = std::chrono::system_clock::now() +
-											std::chrono::hours(24);
+											std::chrono::hours(59*24);
 					}
 
 					_token_received = true;
@@ -151,8 +168,11 @@ private:
 	}
 
 private:
-	AuthManager(const Config &config)
-		: _config(config), _token_received(false) {}
+	AuthManager() : _token_received(false) {
+		if (_token.access_token.empty()) {
+			load_token();
+		}
+	}
 
 	Config _config;
 	Token _token;

@@ -12,11 +12,11 @@ set(COMMON_FLAGS
 	-pedantic
 	-stdlib=libc++
 	-fmodules
-	-fcxx-modules
 	-march=native
 	-O0
 )
 
+add_subdirectory(app/cli)
 add_subdirectory(app/core/auth)
 add_subdirectory(app/core/parser)
 add_subdirectory(app/core/storage/entities)
@@ -26,6 +26,7 @@ add_subdirectory(app/core/analysis)
 
 add_executable(${PROJECT_NAME} app/main.cpp)
 target_link_libraries(${PROJECT_NAME} PRIVATE
+	cli
 	auth
 	storage
 	connection

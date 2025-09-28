@@ -6,4 +6,4 @@ target_sources(analysis
 		FILES
 			analysis.cppm
 )
-target_link_libraries(analysis PRIVATE storage parser)
+target_link_libraries(analysis PRIVATE storage)

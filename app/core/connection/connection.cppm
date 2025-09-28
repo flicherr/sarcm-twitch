@@ -2,9 +2,7 @@ module;
 
 #include <asio.hpp>
 #include <iostream>
-#include <functional>
 #include <string>
-#include <thread>
 
 export module connection;
 
@@ -18,40 +16,25 @@ export class Connection {
 public:
 	explicit Connection() : _socket(_io_context) {}
 
-	bool connect(const std::string &host,
-				 const std::string &port,
-				 const std::string &nick,
-				 const std::string &channel)
-	{
-		_nick = nick;
-		_channel = channel;
-
+	void connect(const std::string &nick, const std::string &channel) {
 		try {
 			tcp::resolver resolver(_io_context);
-			auto endpoints = resolver.resolve(host, port);
+			auto endpoints = resolver.resolve("irc.chat.twitch.tv", "6667");
 			asio::connect(_socket, endpoints);
 
-			/* authorize IRC */
-			auto &auth = AuthManager::instance({
-				"xy75wpl6n3erfhkkde0wkcmoz3ykdi",
-				"http://localhost:8080/callback"
-			});
-			if (!auth.get_oauth_irc_token().empty()) {
-				_oauth_token = auth.get_oauth_irc_token();
-			}
+			const auto &auth = AuthManager::instance();
 
-			send_line("PASS " + _oauth_token);
-			send_line("NICK " + _nick);
-			send_line("JOIN #" + _channel);
+			send_line("PASS " + auth.get_oauth_irc_token());
+			send_line("NICK " + nick);
+			send_line("JOIN #" + channel);
 
 			send_line("CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership");
 
-			start_reading();
-			return true;
+			do_read_once();
+			_io_context.run();
 
 		} catch (std::exception &e) {
-			std::cerr << e.what() << '\n';
-			return false;
+			std::cerr << "[Connection] " << e.what() << '\n';
 		}
 	}
 
@@ -63,49 +46,41 @@ public:
 	}
 
 private:
-	asio::io_context _io_context;
-	tcp::socket _socket;
-	asio::streambuf _buffer;
-
-	std::string _nick;
-	std::string _channel;
-	std::string _oauth_token;
-
 	void send_line(const std::string &line) {
 		std::string msg = line + "\r\n";
 		asio::write(_socket, asio::buffer(msg));
 	}
 
-	void start_reading() {
-		do_read_once();
-		_io_context.run();
-	}
-
 	void do_read_once() {
 		asio::async_read_until(_socket, _buffer, "\r\n",
 			[this](std::error_code ec, std::size_t bytes_transferred) {
-				if (!ec) {
-					std::istream is(&_buffer);
-					std::string msg;
-					std::getline(is, msg);
+				if (ec) {
+					std::cerr << ec.message() << '\n';
+					return;
+				}
 
-					if (msg.find("PING :tmi.twitch.tv") != std::string::npos) {
+				std::istream is(&_buffer);
+				std::string msg;
+				std::getline(is, msg);
+
+				if (msg.find("PING :tmi.twitch.tv") != std::string::npos) {
 					send_line("PONG :tmi.twitch.tv");
 				}
-					if (msg.find("PRIVMSG") != std::string::npos) {
-						auto parsed = parse_irc_message(msg);
-
-						auto &storage = StorageManager::instance();
-						storage.upsert_user({parsed.user_id, parsed.username, parsed.display_name});
-						storage.upsert_user_tags({parsed.user_id, parsed.channel, parsed.badges, parsed.color});
-						storage.save_message({parsed.channel, parsed.user_id, parsed.text, parsed.timestamp});
-
-						std::cout << format_chat_message(parsed) << "\n";
-					}
-					asio::post(_io_context, [this]() { do_read_once(); });
-				} else {
-					std::cerr << ec.message() << '\n';
+				if (msg.find("PRIVMSG") != std::string::npos) {
+					auto parsed = parse_irc_message(msg);
+					auto &storage = StorageManager::instance();
+					storage.upsert_user({parsed.user_id, parsed.username, parsed.display_name});
+					storage.upsert_user_tags({parsed.user_id, parsed.channel, parsed.badges, parsed.color});
+					storage.save_message({parsed.channel, parsed.user_id, parsed.text, parsed.timestamp});
+					// std::cout << format_chat_message(parsed) << '\n';
 				}
+				asio::post(_io_context, [this]() { do_read_once(); });
 			});
 	}
+
+private:
+	asio::io_context _io_context;
+	tcp::socket _socket;
+	asio::streambuf _buffer;
+	bool _connected = true;
 };

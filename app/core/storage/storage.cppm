@@ -24,9 +24,9 @@ public:
 		return inst;
 	}
 
-	bool init(const std::string &db_path = "sarcm.db") {
+	bool init(const std::string &db_path = "data/sarcm.db") {
 		if (sqlite3_open(db_path.c_str(), &_db) != SQLITE_OK) {
-			std::cerr << "DB open error: " << sqlite3_errmsg(_db) << "\n";
+			std::cerr << "[StorageManager] DB open error: " << sqlite3_errmsg(_db) << "\n";
 			return false;
 		}
 		exec("PRAGMA journal_mode=WAL;");
@@ -77,15 +77,16 @@ public:
 	            display_name = excluded.display_name;
 	    )SQL";
 
-		if (sqlite3_prepare_v2(_db, sql, -1, &stmt, nullptr) != SQLITE_OK)
-			throw std::runtime_error("Failed to prepare statement for users");
+		if (sqlite3_prepare_v2(_db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+			throw std::runtime_error("[StorageManager] Failed to prepare statement for users");
+		}
 
 		sqlite3_bind_text(stmt, 1, user.id.c_str(), -1, SQLITE_TRANSIENT);
 		sqlite3_bind_text(stmt, 2, user.login.c_str(), -1, SQLITE_TRANSIENT);
 		sqlite3_bind_text(stmt, 3, user.display_name.c_str(), -1, SQLITE_TRANSIENT);
 
 		if (sqlite3_step(stmt) != SQLITE_DONE) {
-			std::cerr << "Insert user failed: " << sqlite3_errmsg(_db) << "\n";
+			std::cerr << "[StorageManager] Insert user failed: " << sqlite3_errmsg(_db) << "\n";
 		}
 		sqlite3_finalize(stmt);
 	}
@@ -101,7 +102,7 @@ public:
 	    )SQL";
 
 		if (sqlite3_prepare_v2(_db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-			throw std::runtime_error("Failed to prepare statement for tags");
+			throw std::runtime_error("[StorageManager] Failed to prepare statement for tags");
 		}
 
 		sqlite3_bind_text(stmt, 1, tags.user_id.c_str(), -1, SQLITE_TRANSIENT);
@@ -110,7 +111,7 @@ public:
 		sqlite3_bind_text(stmt, 4, tags.color.c_str(), -1, SQLITE_TRANSIENT);
 
 		if (sqlite3_step(stmt) != SQLITE_DONE) {
-			std::cerr << "Insert tags failed: " << sqlite3_errmsg(_db) << "\n";
+			std::cerr << "[StorageManager] Insert tags failed: " << sqlite3_errmsg(_db) << "\n";
 		}
 		sqlite3_finalize(stmt);
 	}
@@ -123,7 +124,7 @@ public:
 	    )SQL";
 
 		if (sqlite3_prepare_v2(_db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-			throw std::runtime_error("Failed to prepare statement for messages");
+			throw std::runtime_error("[StorageManager] Failed to prepare statement for messages");
 		}
 		sqlite3_bind_text(stmt, 1, msg.channel_id.c_str(), -1, SQLITE_TRANSIENT);
 		sqlite3_bind_text(stmt, 2, msg.user_id.c_str(), -1, SQLITE_TRANSIENT);
@@ -131,7 +132,7 @@ public:
 		sqlite3_bind_text(stmt, 4, msg.timestamp.c_str(), -1, SQLITE_TRANSIENT);
 
 		if (sqlite3_step(stmt) != SQLITE_DONE) {
-			std::cerr << "Insert message failed: " << sqlite3_errmsg(_db) << "\n";
+			std::cerr << "[StorageManager] Insert message failed: " << sqlite3_errmsg(_db) << "\n";
 		}
 		sqlite3_finalize(stmt);
 	}
@@ -154,7 +155,7 @@ public:
 
 		sqlite3_stmt *stmt;
 		if (sqlite3_prepare_v2(_db, query.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-			std::cerr << "SQLite error: " << "Failed to prepare statement" << "\n";
+			std::cerr << "[StorageManager] SQLite error: " << "Failed to prepare statement" << "\n";
 			return {};
 		}
 		sqlite3_bind_text(stmt, 1, std::string("#" + channel).c_str(), -1, SQLITE_STATIC);
@@ -173,7 +174,9 @@ public:
 	}
 
 private:
-	StorageManager() = default;
+	StorageManager() {
+		init();
+	}
 	~StorageManager() {
 		if (_db) sqlite3_close(_db);
 	}
@@ -184,7 +187,7 @@ private:
 	void exec(const std::string &sql) {
 		char *errMsg = nullptr;
 		if (sqlite3_exec(_db, sql.c_str(), nullptr, nullptr, &errMsg) != SQLITE_OK) {
-			std::cerr << "SQLite error: " << errMsg << "\n";
+			std::cerr << "[StorageManager] SQLite error: " << errMsg << "\n";
 			sqlite3_free(errMsg);
 		}
 	}
