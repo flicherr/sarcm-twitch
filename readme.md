@@ -10,9 +10,7 @@ A console application for saving, analyzing and replaying chat messages Twitch s
 - Analyze stream chat activity:
   - number of messages by time (activity graph);
   - most active users;
-  - popular phrases/words;
-  - emotion usage statistics;
-  - activity of moderators, VIPs, and subs.
+  - popular phrases/words.
 - Replay saved chat according to message timestamps.
 
 ### Installation
