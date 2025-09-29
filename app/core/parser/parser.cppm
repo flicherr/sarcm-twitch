@@ -5,7 +5,6 @@ module;
 #include <iomanip>
 #include <chrono>
 #include <string>
-#include <vector>
 #include <regex>
 #include <map>
 #include <unordered_map>
@@ -69,6 +68,7 @@ export ParsedMessage parse_irc_message(const std::string &raw) {
 
 	/* channel (e.g. #mychannel) */
 	iss >> msg.channel;
+	msg.channel.erase(0, 1);
 
 	/* user_id */
 	msg.user_id = msg.tags.contains("user-id") ? msg.tags.at("user-id") : "";

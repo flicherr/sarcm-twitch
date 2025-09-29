@@ -17,6 +17,11 @@ export struct UserMessageCount {
 	int message_count;
 };
 
+export struct HourMessageCount {
+	int hour;
+	int msg_count;
+};
+
 export class StorageManager {
 public:
 	static StorageManager &instance() {
@@ -24,8 +29,8 @@ public:
 		return inst;
 	}
 
-	bool init(const std::string &db_path = "data/sarcm.db") {
-		if (sqlite3_open(db_path.c_str(), &_db) != SQLITE_OK) {
+	bool init(std::string_view db_path = "data/sarcm.db") {
+		if (sqlite3_open(db_path.data(), &_db) != SQLITE_OK) {
 			std::cerr << "[StorageManager] DB open error: " << sqlite3_errmsg(_db) << "\n";
 			return false;
 		}
@@ -67,7 +72,7 @@ public:
 		return true;
 	}
 
-	void upsert_user(const User &user) {
+	void upsert_user(const User &user) const {
 		sqlite3_stmt *stmt;
 		const char *sql = R"SQL(
 	        INSERT INTO users (id, login, display_name)
@@ -91,7 +96,7 @@ public:
 		sqlite3_finalize(stmt);
 	}
 
-	void upsert_user_tags(const UserChannelTags &tags) {
+	void upsert_user_tags(const UserChannelTags &tags) const {
 		sqlite3_stmt *stmt;
 		const char *sql = R"SQL(
 		    INSERT INTO user_channel_tags (user_id, channel_id, badges, color)
@@ -116,12 +121,12 @@ public:
 		sqlite3_finalize(stmt);
 	}
 
-	void save_message(const ChatMessage &msg) {
+	void save_message(const ChatMessage &msg) const {
 		sqlite3_stmt *stmt;
-			const char *sql = R"SQL(
+		const char *sql = R"SQL(
 		    INSERT INTO messages (channel_id, user_id, text, timestamp)
 	        VALUES (?, ?, ?, ?);
-	    )SQL";
+		)SQL";
 
 		if (sqlite3_prepare_v2(_db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
 			throw std::runtime_error("[StorageManager] Failed to prepare statement for messages");
@@ -137,11 +142,13 @@ public:
 		sqlite3_finalize(stmt);
 	}
 
-	std::vector<UserMessageCount> get_users(std::string channel, int limit = 10) {
+	std::vector<UserMessageCount> get_users(
+		std::string_view channel, const int limit = 10) const
+	{
 		std::vector<UserMessageCount> top_users;
 		top_users.reserve(limit);
 
-		std::string query = R"SQL(
+		const char *query = R"SQL(
 	        SELECT u.display_name, COALESCE(t.color, '') as color, COUNT(m.id) as cnt
 	        FROM users u
 	        JOIN messages m ON m.user_id = u.id
@@ -154,11 +161,11 @@ public:
 	    )SQL";
 
 		sqlite3_stmt *stmt;
-		if (sqlite3_prepare_v2(_db, query.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+		if (sqlite3_prepare_v2(_db, query, -1, &stmt, nullptr) != SQLITE_OK) {
 			std::cerr << "[StorageManager] SQLite error: " << "Failed to prepare statement" << "\n";
 			return {};
 		}
-		sqlite3_bind_text(stmt, 1, std::string("#" + channel).c_str(), -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 1, channel.data(), -1, SQLITE_STATIC);
 		sqlite3_bind_int(stmt, 2, limit);
 
 		while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -171,6 +178,40 @@ public:
 
 		sqlite3_finalize(stmt);
 		return top_users;
+	}
+
+	std::vector<HourMessageCount> get_hourly_activity(
+		std::string_view channel, std::string_view date)
+	{
+		std::vector<HourMessageCount> activity;
+		const char *query = R"SQL(
+            SELECT strftime('%H', timestamp) AS hour,
+                   COUNT(*) as message_count
+            FROM messages
+            WHERE channel_id = ?
+              AND date(timestamp) = ?
+            GROUP BY hour
+            ORDER BY hour;
+        )SQL";
+
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(_db, query, -1, &stmt, nullptr) != SQLITE_OK) {
+			std::cerr << "[StorageManager] SQLite error: " << "Failed to prepare statement" << "\n";
+			return {};
+		}
+		sqlite3_bind_text(stmt, 1, channel.data(), -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 2, date.data(), -1, SQLITE_STATIC);
+
+		while (sqlite3_step(stmt) == SQLITE_ROW) {
+			HourMessageCount h {
+				std::stoi(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0))),
+				sqlite3_column_int(stmt, 1)
+			};
+			activity.emplace_back(h);
+		}
+
+		sqlite3_finalize(stmt);
+		return activity;
 	}
 
 private:

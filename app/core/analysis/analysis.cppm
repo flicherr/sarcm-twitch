@@ -9,21 +9,22 @@ export module analysis;
 import storage;
 
 using UserActivity = UserMessageCount;
+using HourActivity = HourMessageCount;
 
 export class AnalysisManager {
 public:
 	explicit AnalysisManager()
 		: _storage(StorageManager::instance()) {}
 
-	std::vector<UserActivity> get_top_users(
-		const std::string &channel, int limit = 10) {
+	std::vector<UserActivity> top_chatters(
+		std::string_view channel, const int limit = 10) const {
 		return _storage.get_users(channel, limit);
 	}
 
-	// std::vector<HourlyActivity> get_activity_by_hour(
-	// 	const std::string &channel_id) {
-	// 	return _storage.get_messages_by_channel(channel_id);
-	// }
+	std::vector<HourActivity> hourly_active(
+		std::string_view channel, std::string_view date) {
+		return _storage.get_hourly_activity(channel, date);
+	}
 
 private:
 	StorageManager &_storage;
