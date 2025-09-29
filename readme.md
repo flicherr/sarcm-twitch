@@ -40,13 +40,21 @@ Stop capturing the chats of all channels:
 ```bash
 > stop-all
 ```
-Display information about the channel's top users:
+Display information about the channel's top chatters:
 ```bash
-> top-us <channel> <quantity>
+> top-chatters <channel> <quantity>
+```
+Display chat activity <date> in the <channel> channel:
+```bash
+> hourly-active <channel> <date>
 ```
 Display list active channels:
 ```bash
-> status // OR stat
+> status
+```
+Quit the program:
+```bash
+> q
 ```
 Execute command terminal:
 ```bash
