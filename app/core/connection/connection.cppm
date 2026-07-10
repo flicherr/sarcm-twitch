@@ -14,12 +14,14 @@ using asio::ip::tcp;
 
 export class Connection {
 public:
-	explicit Connection() : _socket(_io_context) {}
+	Connection() : _socket(_io_context) {  }
 
 	void connect(const std::string &nick, const std::string &channel) {
 		try {
 			tcp::resolver resolver(_io_context);
-			auto endpoints = resolver.resolve("irc.chat.twitch.tv", "6667");
+			auto endpoints = resolver.resolve(
+				asio::string_view("irc.chat.twitch.tv"),
+				asio::string_view("6667"));
 			asio::connect(_socket, endpoints);
 
 			const auto &auth = AuthManager::instance();
@@ -28,11 +30,11 @@ public:
 			send_line("NICK " + nick);
 			send_line("JOIN #" + channel);
 
-			send_line("CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership");
+			send_line("CAP REQ :twitch.tv/tags \
+				twitch.tv/commands twitch.tv/membership");
 
 			do_read_once();
 			_io_context.run();
-
 		} catch (std::exception &e) {
 			std::cerr << "[Connection] " << e.what() << '\n';
 		}
@@ -69,9 +71,12 @@ private:
 				if (msg.find("PRIVMSG") != std::string::npos) {
 					auto parsed = parse_irc_message(msg);
 					auto &storage = StorageManager::instance();
-					storage.upsert_user({parsed.user_id, parsed.username, parsed.display_name});
-					storage.upsert_user_tags({parsed.user_id, parsed.channel, parsed.badges, parsed.color});
-					storage.save_message({parsed.channel, parsed.user_id, parsed.text, parsed.timestamp});
+					storage.upsert_user({parsed.user_id,
+						parsed.username, parsed.display_name});
+					storage.upsert_user_tags({parsed.user_id,
+						parsed.channel, parsed.badges, parsed.color});
+					storage.save_message({parsed.channel,
+						parsed.user_id, parsed.text, parsed.timestamp});
 					// std::cout << format_chat_message(parsed) << '\n';
 				}
 				asio::post(_io_context, [this]() { do_read_once(); });
