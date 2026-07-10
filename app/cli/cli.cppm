@@ -8,6 +8,7 @@ module;
 #include <unordered_map>
 #include <utility>
 #include <sys/ioctl.h>
+#include <unistd.h>
 
 export module tcli;
 
@@ -18,7 +19,9 @@ import parser;
 class ChatWorker {
 public:
 	ChatWorker(std::string username, std::string channel) :
-	_username(std::move(username)), _channel(std::move(channel)), _thread(&ChatWorker::run, this) {}
+		_username(std::move(username)),
+		_channel(std::move(channel)),
+		_thread(&ChatWorker::run, this) {}
 
 	void stop() {
 		_conn.close();
@@ -67,7 +70,7 @@ public:
 	void stop_all() {
 		for (auto &worker: _workers | std::views::values) {
 			worker->stop();
-			worker.release();
+			worker.reset();
 		}
 		_workers.clear();
 		std::cout << "  stopped all channels.\n";

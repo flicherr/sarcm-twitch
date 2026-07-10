@@ -2,18 +2,16 @@ module;
 
 #include <iostream>
 #include <sstream>
-#include <iomanip>
 #include <chrono>
 #include <string>
-#include <regex>
 #include <map>
 #include <unordered_map>
 
 export module parser;
 
 struct ParsedMessage {
-	std::map<std::string, std::string> tags;	// все теги Twitch IRC
-	std::string prefix;                			// часть вида user!user@user.tmi.twitch.tv
+	std::map<std::string, std::string> tags;	// all tags Twitch IRC
+	std::string prefix;                			// section view user!user@user.tmi.twitch.tv
 	std::string command;               			// PRIVMSG, JOIN, PART, PING и т.д.
 
 	std::string user_id;

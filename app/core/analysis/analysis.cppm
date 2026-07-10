@@ -1,8 +1,7 @@
 module;
 
-#include <iostream>
-#include <string>
 #include <vector>
+#include <string_view>
 
 export module analysis;
 
@@ -22,7 +21,7 @@ public:
 	}
 
 	std::vector<HourActivity> hourly_active(
-		std::string_view channel, std::string_view date) {
+		std::string_view channel, std::string_view date) const {
 		return _storage.get_hourly_activity(channel, date);
 	}
 
