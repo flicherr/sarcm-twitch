@@ -6,3 +6,4 @@ target_sources(auth
 		FILES
 			auth.cppm
 )
+target_link_libraries(auth PRIVATE storage)

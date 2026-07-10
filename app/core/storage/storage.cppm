@@ -2,14 +2,12 @@ module;
 
 #include <sqlite3.h>
 #include <iostream>
-#include <sstream>
-#include <iomanip>
-#include <chrono>
+#include <vector>
 #include <string>
 
 export module storage;
 
-import :entities;
+export import :entities;
 
 export struct UserMessageCount {
 	std::string display_name;
@@ -36,6 +34,13 @@ public:
 		}
 		exec("PRAGMA journal_mode=WAL;");
 		exec("PRAGMA synchronous=NORMAL;");
+
+		exec(R"SQL(
+	        CREATE TABLE IF NOT EXISTS token_auth (
+	            access_token TEXT,
+	            expires_at TEXT
+	        );
+	    )SQL");
 
 		exec(R"SQL(
 	        CREATE TABLE IF NOT EXISTS users (
@@ -72,6 +77,67 @@ public:
 		return true;
 	}
 
+	void clear_old_tokens() const {
+		sqlite3_stmt *stmt;
+		const char *sql = R"SQL(
+			DELETE FROM token_auth;
+		)SQL";
+
+		if (auto result = sqlite3_prepare_v2(_db, sql, -1, &stmt, nullptr); result != SQLITE_OK) {
+			throw std::runtime_error(
+				"[StorageManager] Failed to prepare statement for token_auth \
+				(" + std::to_string(result) + ")");
+		}
+
+		if (sqlite3_step(stmt) != SQLITE_DONE) {
+			std::cerr << "[StorageManager] Delete token failed: " << sqlite3_errmsg(_db) << "\n";
+		}
+		sqlite3_finalize(stmt);
+	}
+
+	void save_token(const Token &t) const {
+		sqlite3_stmt *stmt;
+		const char *sql = R"SQL(
+		    INSERT INTO token_auth (access_token, expires_at)
+	        VALUES (?, ?);
+		)SQL";
+
+		if (auto result = sqlite3_prepare_v2(_db, sql, -1, &stmt, nullptr); result != SQLITE_OK) {
+			throw std::runtime_error(
+				"[StorageManager] Failed to prepare statement for token_auth \
+				(" + std::to_string(result) + ")");
+		}
+		sqlite3_bind_text(stmt, 1, t.access_token.c_str(), -1, SQLITE_TRANSIENT);
+		sqlite3_bind_text(stmt, 2, t.expires_at.c_str(), -1, SQLITE_TRANSIENT);
+
+		if (sqlite3_step(stmt) != SQLITE_DONE) {
+			std::cerr << "[StorageManager] Insert token failed: " << sqlite3_errmsg(_db) << "\n";
+		}
+		sqlite3_finalize(stmt);
+	}
+
+	Token get_token() const {
+		const char *query = R"SQL(
+	        SELECT t.access_token, t.expires_at
+	        FROM token_auth t
+			LIMIT 1
+	    )SQL";
+
+		sqlite3_stmt *stmt;
+		if (sqlite3_prepare_v2(_db, query, -1, &stmt, nullptr) != SQLITE_OK) {
+			std::cerr << "[StorageManager] SQLite error: " << "Failed to prepare statement" << "\n";
+			return {};
+		}
+
+		Token token;
+		if (sqlite3_step(stmt) == SQLITE_ROW) {
+			token.access_token = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+			token.expires_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+		}
+		sqlite3_finalize(stmt);
+		return token;
+	}
+	
 	void upsert_user(const User &user) const {
 		sqlite3_stmt *stmt;
 		const char *sql = R"SQL(
@@ -216,7 +282,11 @@ public:
 
 private:
 	StorageManager() {
-		init();
+		if (_db == nullptr) {
+			if (init() == false) {
+				std::cout << "[StorageManager] Failed to initialize database\n";
+			}
+		}
 	}
 	~StorageManager() {
 		if (_db) sqlite3_close(_db);
